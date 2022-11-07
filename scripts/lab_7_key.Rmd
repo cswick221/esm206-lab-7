@@ -1,0 +1,236 @@
+---
+title: "lab_7_key"
+author: "C.L. Jerde"
+date: "2022-11-04"
+output:   
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning = FALSE,results=FALSE)
+library(tidyverse)
+library(here)
+library(ggpubr) # for some graphic applications that extend ggplot2
+library(janitor)
+library(broom) # used to make tables
+library(knitr) # used to make table
+```
+### Overview:
+**Set up an R project** and load up the tree_mod.csv data. You will need to install packages `knitr` and `broom`. You should also set up code folding for practice and set the default options of your chunks to `echo= TRUE`, `message=FALSE`, `warning = FALSE`, `results = FALSE` and then we will modify them for each chunk as we need different information displayed.  This is practice for making a professional looking document. Look at the difference between this lab's .RMD file and the .HTML file.
+
+**This week we will:**
+1. Revisit simple linear regression using the tree data
+2. Investigate residual plots
+3. Consider other explanatory variables
+4. Demonstrate correlation and discuss why this is critical for linear regression
+5. Work through ideas of multiple regression including interactions
+6. Put output into tables
+7. Bonus: An example of coding a table in R markdown 
+
+
+# Example of multiple linear regression
+
+### Data overview
+
+The focus of lab 7 will be linear regression manipulation and multiple linear regression. Here we will begin our exploration with some plotting and "simple" analysis. This example is from: [here](https://www.rforecology.com/post/how-to-do-simple-linear-regression-in-r/)
+
+One of the most common and useful analysis you will learn about and use is simple linear regression. The practical use is for understanding how some dependent variable changes as a function of a an independent variable. Let us start with an ecology example. Tree height can be vary hard to measure so many foresters and scientists use a metric of diameter at breast height (DBH, 4.5 feet from the ground). This way, the person in the field can quickly measure the diameter and understand the distribution of tree heights or volumes in an area. Of course this can be dependent on things like the tree species, so we often want to compare the quick measure (DBH) to some accurately measured tree heights and volumes. The data provided in tree_mod.csv are for 31 black cherry trees that were measured for DBH and then felled to obtain accurate measures of height and volume. Here is a link to a full description: <https://r-data.pmagunia.com/dataset/r-dataset-package-datasets-trees>
+
+Note DBH is named Girth as a variable of interest. I used the tree_mod.csv file provided in lab 6.
+
+```{r}
+trees_mod <- read_csv(here("data","trees_mod.csv"))
+
+# Let us use janitor() and clean up the names
+trees <- trees_mod %>% clean_names()
+
+#Note that the girth is DBH and is measured in inches, height is measured in feet, and volume is measured in cubic feet.  
+```
+
+Last week we started with a scatter plot of DBH and height. Let us start there again. Practice writing figure captions as time allows. 
+
+```{r tree, fig.align='center',fig.cap="Figure 1. Scatter plot of DBH (in.) and height of the tree (ft.)."}
+
+tree_scatter<-ggplot(trees, aes(x=height, y=girth)) + geom_point() + labs(x="Height (ft.)", y="DBH (in.)")+xlim(60,90)+ylim(0,25) + theme_bw() 
+
+tree_scatter
+```
+
+### Single variable regressions models
+
+Before we consider a linear relationship, we may want to consider a null model that there is no relationship between DBH and height. This model can be written as: Y = B~0~ + error.  Essentially this is finding the mean of the DBH (aka girth).
+
+###### Null model
+
+```{r, results=TRUE}
+model_0 <- lm(girth ~ 1, data=trees)
+summary(model_0)
+
+#if you want to check the mean and standard error out put of the lm function, try this
+mean(trees$girth)
+sd(trees$girth)/sqrt(length((trees$girth)-1))
+
+```
+
+This model says there is no relationship between DBH and tree height. We can plot this as:
+
+```{r tree_0, fig.align='center',fig.cap="Figure 1. DBH (in.) with no relationship with tree height (ft.). The mean DBH (dashed line) is 13.25 inches (s.e. 0.56) and is significantly different from zero (p<0.05)."}
+
+tree_scatter_0<-ggplot(trees, aes(x=height, y=girth)) + geom_point() + labs(x="Height (ft.)", y="DBH (in.)")+xlim(60,90)+ylim(0,25) + geom_hline(yintercept=13.25,linetype="dashed")+ theme_bw() 
+
+#geom_hline allows for you to make a horizontal line on a figure.
+
+tree_scatter_0
+```
+
+We can look at the residual plots using the `plot()` command. Some of these won't work because there is not an x variable (height). However, the plot of the residual vs. fitted shows the distribution of DBH around the mean and the qq plot is appropriate. Generally you do not put these in the document, but run the diagnostics in the console. However, you may want to use one of these plots. Example code for producing all the plots in teh console is `plot(model_0)`.
+
+But as we explored in the last lab period, there is a linear relationship. Let us run the  linear model, plot the model, and look at the residuals.
+
+**Is there a linear relationship of DBH as a function of tree height?**
+
+We can start by fitting a linear model using ordinary least squares (OLS). And then we can fit that line to our data. We will do more in-depth discussion in class this week.
+
+###### Regression with slope and intercept
+
+```{r, results=TRUE}
+#fit a linear model (linear regression)
+model_1 <- lm(girth ~ height, data=trees)
+summary(model_1)
+```
+
+Look at the residual plots using `plot(model_1)`.
+
+It is worth noting that for the intercept for this model is not significant, P>0.05. For the next model, we will consider a regression without an intercept. For now, let us make a figure of this model. Quick plot the model and the data with a caption
+
+```{r tree_1, fig.align='center',fig.cap="Figure 2. DBH (in.) regressed on Height of the tree (ft.). Height is a significant explanitory variable of DBH (P=0.0028). However, Coeffeiciet of Determination is 0.27, so there is considerable unexplained variablity in DBH remaining to be explained."}
+
+tree_scatter_1<-ggplot(trees, aes(x=height, y=girth)) + geom_point() + labs(x="Height (ft.)", y="DBH (in.)")+xlim(60,90)+ylim(0,25) + geom_smooth(formula = y ~ x, method = "lm")+ theme_bw() 
+
+tree_scatter_1
+```
+
+**How can we drop the intercept parameter and force the line through the intercept (x = 0,y = 0)?**
+
+###### Regression with slope only
+
+```{r, results=TRUE}
+#fit a linear model (linear regression)
+model_2 <- lm(girth ~ -1 + height, data=trees) # the -1 drops the intercept paramter and forces the regression through the origin
+summary(model_2)
+```
+
+Not there is not an intercept under the list of coefficients. The model for this linear regression is DBH = 0.175 (Height). This mean for every foot of height the DBH increases by 0.175 inches. How does this look graphically?
+
+```{r tree_2, fig.align='center',fig.cap="Figure 3. DBH (in.) regressed on Height of the tree (ft.). Height is a significant explanitory variable of DBH (p<0.05). However, this model has no intercept parameter."}
+
+tree_scatter_2<-ggplot(trees, aes(x=height, y=girth)) + geom_point() + labs(x="Height (ft.)", y="DBH (in.)")+xlim(60,90)+ylim(0,25) + geom_smooth(formula = y ~ -1 + x, method = "lm")+ theme_bw() 
+
+tree_scatter_2
+```
+
+Note the coefficient of determination for a regression model without an intercept has a different formulation and hence the value is very large relative to the slope and intercept model. See this note about why: <https://www.riinu.me/2014/08/why-does-linear-model-without-an-intercept-forced-through-the-origin-have-a-higher-r-squared-value-calculated-by-r/>. The take home point is that R-squared is not comparable between models with and without intercept parameters. Another limitation of using R-squared!
+
+### Correlations
+
+This data set has three variables, girth(DBH), height (ft.), and volume (cu.ft.). Could it be that volume is a better explanatory variable than height? One way to investigate this issues is to start with an assessment of correlation. Correlation can range between -1 and 1, negatively correlated and positively correlated, respectively. A correlation of zero implies no correlation.
+
+In R, we can assess correlation of any two variables using:
+
+```{r, results=TRUE}
+cor.test(trees$height, trees$volume, method="pearson")
+```
+
+What are the null and alternative hypotheses here? 
+
+We expect there to be some correlation between height and volume due to the growth processes of plants. Correlation if often an evaluation of shared information between two variables. If the variables are perfectly correlated (positive or negative), then if I known the value of one variable, I know the value of the other variable. Do we have perfect correlation between height and volume? 
+
+### Multiple linear regression 
+Let us start by just looking at volume instead of height to explain the variability in DBH.
+
+###### Slope and intercept model
+
+Let us skip the null model and jump directly to a model with slope and intercept:
+
+```{r, results=TRUE}
+#fit a linear model (linear regression)
+model_3 <- lm(girth ~ volume, data=trees)
+summary(model_3)
+```
+
+Without looking at the plot, do you expect the data to be very close to the regression line? How can you tell? Do we really need to consider the null model or the no intercept model?
+
+And then we plot:
+
+```{r tree_4, fig.align='center',fig.cap="Figure 3. DBH (in.) regressed on Volume of the tree (cu.ft.). Height is a significant explanitory variable of DBH (p=0.0028). However, this model has no intercept parameter."}
+
+tree_scatter_3<-ggplot(trees, aes(x=volume, y=girth)) + geom_point() + labs(x="Volume (cu. ft.)", y="DBH (in.)") + xlim(0,100) + ylim(0,25) + geom_smooth(formula = y ~  x, method = "lm")+ theme_bw() 
+
+tree_scatter_3
+```
+
+Look at the residual plots in the console, `plot(model_3)`. Is there anything of concern?
+
+We know from the correlation analysis that height and volume are not perfectly correlated. And we know that volume is significantly explains the variation in DBH, as does height. But maybe they have different information that could help explain more information if taken together. This is the motivation for multiple regression.
+
+### Multiple regression model
+
+```{r, results=TRUE}
+#fit a linear model (linear regression)
+model_4 <- lm(girth ~ volume + height, data=trees)
+summary(model_4)
+```
+
+What do you conclude from the regression model output? Did you inspect the residuals? Should they look like the residuals from the height only regression or the volume only regression and why?
+
+###### Multiple regression model with interaction
+
+An interaction occurs when an independent variable has a different effect on the outcome depending on the values of another independent variable. In this case we may say that height and volume may interact depending on the growth pattern of the tree. In general, if the interaction is significant, then all variables that comprise the interaction should be included in the model.
+
+```{r, results=TRUE}
+#fit a linear model (linear regression)
+model_5 <- lm(girth ~ volume * height, data=trees)
+summary(model_5)
+```
+
+What do you conclude from the regression model output? Did you inspect the residuals? Should they look like the residuals from the height only regression or the volume only regression and why?
+
+In general you do not see plots of multiple regression models. Thinking back to our discussion of properties of good data visualization, complicated plots can be problematic. However, someday you may want to show more detail. Here is a good resource: https://www.statology.org/plot-multiple-linear-regression-in-r/
+
+### Making a table out of lm() output
+
+We can use the `broom` package to clean up our linear model output. Try this to make a tibble. A tibble is way to make data frames (aka DATA!) that can be saved. This is very handy when you want to save model output or put it into a table of your report.
+
+```{r,results=TRUE}
+out_5_tidy <- tidy(model_5) # for the coefficient output
+out_5_glance <- glance(model_5) # for the model output
+```
+
+However, this does not make pretty tables in an R markdown document. For that we can use `kable()`. This function is part of the `knitr` package we installed.
+
+```{r, results=TRUE}
+kable(out_5_tidy, format = "markdown", digits = 3,caption = "Tests of linear model (model 5) coefficients")
+```
+
+```{r, results = TRUE}
+kable(out_5_glance,format = "markdown", digits = 3,caption = "Tests of linear model (model 5).")
+```
+
+###### Bonus material about tables
+
+Let us say you want to present information in a table within your R markdown document. You can do this outside of formatting a CSV file into a `data.frame` or `tibble` and use the `kable( )` command. Or you can code it directly. Here is an example modified from R Cookbook by Long and Teetor, 2nd. Ed. (2019). Make sure you look for options to best suit your needs as there are many ways to move model data around and present tables in your documents. Go explore!
+
+| Stooge | DOB  | Hair? |
+|:------:|:----:|:-----:|
+|  Moe   | 1887 |  Yes  |
+| Larry  | 1902 |  Yes  |
+| Curly  | 1903 |  No   |
+
+![](https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Three_Stooges_1937.jpg/400px-Three_Stooges_1937.jpg)
+
+
+
+
+
+
