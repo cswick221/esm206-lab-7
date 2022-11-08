@@ -1,0 +1,198 @@
+---
+title: "Lab 7"
+author: "C.Swick"
+date: "2022-11-08"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, results = FALSE)
+library(tidyverse)
+library(here)
+library(ggpubr)
+library(janitor)
+library(broom)
+library(knitr)
+```
+
+
+#Load Data 
+```{r}
+trees_mod <- read_csv(here("data", "trees_mod.csv"))
+trees <- trees_mod %>%  clean_names()
+```
+
+```{r tree, fig.align="center", fig.cap="Figure 1: scatter plot of DBH (in.) and height of the tree (ft.)."}
+tree_scatter <- ggplot(trees, aes(x=height, y=girth)) + geom_point() +
+  labs(x= "Height (ft.)", y= "DBH (in.)") +
+  xlim(60,90)+ylim(0,25) +
+  theme_bw()
+
+tree_scatter
+
+```
+
+
+## Model 0
+```{r results=TRUE}
+model_0 <- lm(girth~1, data = trees)
+summary(model_0)
+
+#check the output 
+mean(trees$girth)
+sd(trees$girth)/sqrt(length((trees$girth)-1))
+
+```
+
+
+
+## Plot model_0
+finding and showing mean of y 
+
+```{r results=TRUE}
+tree_scatter_0 <- ggplot(trees, aes(x=height, y=girth)) + geom_point() +
+  labs(x= "Height (ft.)", y= "DBH (in.)") +
+  xlim(60,90)+ylim(0,25) +
+  geom_hline(yintercept = 13.25, linetype = "dashed") +
+  theme_bw()
+
+tree_scatter_0
+
+```
+
+
+## model_1 
+
+```{r results=TRUE}
+model_1 <- lm(girth~height, data = trees)
+summary(model_1)
+
+```
+
+
+# Plot model_1
+```{r results=TRUE}
+tree_scatter_1 <- ggplot(trees, aes(x=height, y=girth)) + geom_point() +
+  labs(x= "Height (ft.)", y= "DBH (in.)") +
+  xlim(60,90)+ylim(0,25) +
+  geom_smooth(formula = y~x, method = "lm") +
+  theme_bw()
+
+tree_scatter_1
+
+```
+
+
+## model_2 (no intercept)
+we removed the intercept because it had a large standard error and r value (not enough evidence to say its different from 0), we set the intercept to 0, because tree height and dbh cant be less than 0
+```{r results=TRUE}
+model_2 <- lm(girth~ -1 + height, data = trees)
+summary(model_2)
+
+```
+
+
+# Plot model_2
+```{r results=TRUE}
+tree_scatter_2 <- ggplot(trees, aes(x=height, y=girth)) + geom_point() +
+  labs(x= "Height (ft.)", y= "DBH (in.)") +
+  xlim(0,90)+ylim(0,25) +
+  geom_smooth(formula = y~-1+x, method = "lm") +
+  theme_bw()
+
+tree_scatter_2
+
+```
+
+
+
+in code
+> plot(model_2)
+Hit <Return> to see next plot: 
+Hit <Return> to see next plot: 
+Hit <Return> to see next plot:
+
+
+
+## Correlations
+```{r results=TRUE}
+cor.test(trees$height, trees$volume, method = "pearson")
+# about 59.8% correlation
+# reject null in favor of alternative, p-value is small 
+```
+
+
+
+## model_3 
+
+```{r results=TRUE}
+model_3 <- lm(girth~ volume, data = trees)
+summary(model_3)
+# both intercept and volume and significant different from 0 so they are both valid explanatory variables 
+# for every one unit increase in volume, you add .184 inches in height 
+```
+
+
+explaining values of y with information from x 
+~ "as a function of" y is a function of the following girth = y
+R^2 amount of variation comapred to a mean only model (model_0)
+  null model (mean) has lots of variability, a good linear model will have less variability 
+  the R^2 is 1- variation of model divided by variation in null 
+    we want a larger R^2 value 
+    
+## model_4
+
+```{r results=TRUE}
+model_4 <- lm(girth~ volume + height, data = trees)
+summary(model_4)
+# intercept and volume are significantly different from 0
+#change due to height is not significantly different from 0
+```
+
+
+## model_5
+
+```{r results=TRUE}
+model_5 <- lm(girth~ volume * height, data = trees)
+summary(model_5)
+# the * tells me about significance, the intercept is not significantly different from 0
+```
+
+
+
+# Plot model_5????
+```{r results=TRUE}
+tree_scatter_5 <- ggplot(trees, aes(x=volume, y=girth)) + geom_point() +
+  labs(x= "volume", y= "DBH (in.)") +
+  xlim(0,90)+ylim(0,25) +
+  geom_smooth(formula = y~x+height+height*x, method = "lm") +
+  theme_bw()
+
+tree_scatter_5
+
+```
+
+
+#making data frames and tables 
+```{r results = TRUE}
+out_5_tidy <- tidy(model_5) # coefficients part 
+out_5_glance <- glance(model_5) # model part 
+# tidy and glance in broom package 
+
+out_5_glance
+out_5_tidy
+```
+
+
+
+```{r results = TRUE}
+kable(out_5_tidy, format = "markdown", digits = 3, caption = "Tests of Linear Model (model 5) coefficients")
+kable(out_5_glance, format = "markdown", digits = 3, caption = "Tests of Linear Model (model 5)")
+```
+
+
+
+
+
